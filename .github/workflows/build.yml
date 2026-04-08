@@ -13,7 +13,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential uuid-dev nasm python3 python3-distutils
+        # python3-distutils is deprecated, use python3-full instead
+        sudo apt-get install -y build-essential uuid-dev nasm python3 python3-full iasl
         
     - name: Checkout EDK II
       run: |
@@ -34,21 +35,15 @@ jobs:
         echo "WORKSPACE=$PWD" >> $GITHUB_ENV
         echo "EDK_TOOLS_PATH=$PWD/BaseTools" >> $GITHUB_ENV
         
-    - name: Build OvmfPkg (includes your app)
+    - name: Build OvmfPkg
       run: |
         cd edk2
-        # Add your app to the OvmfPkg DSC file
+        # Add your app to the build
         sed -i '/\[Components\.X64\]/a\  MdeModulePkg/MyApps/MemoryReader.inf' OvmfPkg/OvmfPkgX64.dsc
         build -a X64 -p OvmfPkg/OvmfPkgX64.dsc -b RELEASE -t GCC5
         
-    - name: Upload OVMF firmware (optional)
+    - name: Upload EFI file
       uses: actions/upload-artifact@v4
       with:
-        name: OVMF-with-MemoryReader
-        path: edk2/Build/OvmfX64/RELEASE_GCC5/FV/OVMF.fd
-        
-    - name: Upload standalone EFI file
-      uses: actions/upload-artifact@v4
-      with:
-        name: MemoryReader-standalone
+        name: MemoryReader
         path: edk2/Build/OvmfX64/RELEASE_GCC5/X64/MemoryReader.efi
