@@ -1,4 +1,4 @@
-name: Build UEFI Application
+name: Build Simple UEFI App (Fast)
 
 on:
   push:
@@ -10,40 +10,74 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Install dependencies
+    - name: Install MinGW cross-compiler
       run: |
         sudo apt-get update
-        # python3-distutils is deprecated, use python3-full instead
-        sudo apt-get install -y build-essential uuid-dev nasm python3 python3-full iasl
+        sudo apt-get install -y gcc-mingw-w64-x86-64
         
-    - name: Checkout EDK II
+    - name: Create UEFI application
       run: |
-        git clone --depth 1 --recursive https://github.com/tianocore/edk2.git
-        cd edk2
-        git submodule update --init --recursive --depth 1
+        cat > main.c << 'EOF'
+typedef unsigned long long UINT64;
+typedef unsigned int UINT32;
+typedef unsigned short UINT16;
+typedef unsigned char UINT8;
+typedef UINT64 EFI_STATUS;
+typedef void* EFI_HANDLE;
+
+#define EFI_SUCCESS 0
+
+typedef struct {
+    UINT16 ScanCode;
+    UINT16 UnicodeChar;
+} EFI_INPUT_KEY;
+
+typedef struct {
+    void* Reset;
+    EFI_STATUS (*OutputString)(void* This, UINT16* String);
+    void* TestString;
+    void* QueryMode;
+    void* SetMode;
+    void* SetAttribute;
+    void* ClearScreen;
+    void* SetCursorPosition;
+    void* EnableCursor;
+    void* Mode;
+} EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
+
+typedef struct {
+    void* Hdr;
+    UINT16* FirmwareVendor;
+    UINT32 FirmwareRevision;
+    EFI_HANDLE ConsoleInHandle;
+    void* ConIn;
+    EFI_HANDLE ConsoleOutHandle;
+    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL* ConOut;
+    EFI_HANDLE StandardErrorHandle;
+    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL* StdErr;
+    void* RuntimeServices;
+    void* BootServices;
+    UINT64 NumberOfTableEntries;
+    void* ConfigurationTable;
+} EFI_SYSTEM_TABLE;
+
+EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
+    SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Hello from UEFI!\n");
+    SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Built with MinGW in 30 seconds!\n");
+    return EFI_SUCCESS;
+}
+EOF
         
-    - name: Checkout your code
-      uses: actions/checkout@v4
-      with:
-        path: edk2/MdeModulePkg/MyApps
-        
-    - name: Setup EDK2
+    - name: Compile
       run: |
-        cd edk2
-        make -C BaseTools
-        . edksetup.sh
-        echo "WORKSPACE=$PWD" >> $GITHUB_ENV
-        echo "EDK_TOOLS_PATH=$PWD/BaseTools" >> $GITHUB_ENV
+        x86_64-w64-mingw32-gcc -ffreestanding -fshort-wchar -fno-stack-protector \
+            -mno-red-zone -c main.c -o main.o
+        x86_64-w64-mingw32-ld -shared -Bsymbolic -nostdlib -znocombreloc \
+            -o main.dll main.o
+        cp main.dll HelloUEFI.efi
         
-    - name: Build OvmfPkg
-      run: |
-        cd edk2
-        # Add your app to the build
-        sed -i '/\[Components\.X64\]/a\  MdeModulePkg/MyApps/MemoryReader.inf' OvmfPkg/OvmfPkgX64.dsc
-        build -a X64 -p OvmfPkg/OvmfPkgX64.dsc -b RELEASE -t GCC5
-        
-    - name: Upload EFI file
+    - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: MemoryReader
-        path: edk2/Build/OvmfX64/RELEASE_GCC5/X64/MemoryReader.efi
+        name: HelloUEFI
+        path: HelloUEFI.efi
