@@ -1,4 +1,4 @@
-name: Build Simple UEFI App (Fast)
+name: Build Simple UEFI App
 
 on:
   push:
@@ -11,72 +11,66 @@ jobs:
     
     steps:
     - name: Install MinGW cross-compiler
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-mingw-w64-x86-64
+      run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
         
     - name: Create UEFI application
       run: |
-        cat > main.c << 'EOF'
-typedef unsigned long long UINT64;
-typedef unsigned int UINT32;
-typedef unsigned short UINT16;
-typedef unsigned char UINT8;
-typedef UINT64 EFI_STATUS;
-typedef void* EFI_HANDLE;
-
-#define EFI_SUCCESS 0
-
-typedef struct {
-    UINT16 ScanCode;
-    UINT16 UnicodeChar;
-} EFI_INPUT_KEY;
-
-typedef struct {
-    void* Reset;
-    EFI_STATUS (*OutputString)(void* This, UINT16* String);
-    void* TestString;
-    void* QueryMode;
-    void* SetMode;
-    void* SetAttribute;
-    void* ClearScreen;
-    void* SetCursorPosition;
-    void* EnableCursor;
-    void* Mode;
-} EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
-
-typedef struct {
-    void* Hdr;
-    UINT16* FirmwareVendor;
-    UINT32 FirmwareRevision;
-    EFI_HANDLE ConsoleInHandle;
-    void* ConIn;
-    EFI_HANDLE ConsoleOutHandle;
-    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL* ConOut;
-    EFI_HANDLE StandardErrorHandle;
-    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL* StdErr;
-    void* RuntimeServices;
-    void* BootServices;
-    UINT64 NumberOfTableEntries;
-    void* ConfigurationTable;
-} EFI_SYSTEM_TABLE;
-
-EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
-    SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Hello from UEFI!\n");
-    SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Built with MinGW in 30 seconds!\n");
-    return EFI_SUCCESS;
-}
-EOF
+        echo 'typedef unsigned long long UINT64;' > main.c
+        echo 'typedef unsigned int UINT32;' >> main.c
+        echo 'typedef unsigned short UINT16;' >> main.c
+        echo 'typedef unsigned char UINT8;' >> main.c
+        echo 'typedef UINT64 EFI_STATUS;' >> main.c
+        echo 'typedef void* EFI_HANDLE;' >> main.c
+        echo '' >> main.c
+        echo '#define EFI_SUCCESS 0' >> main.c
+        echo '' >> main.c
+        echo 'typedef struct {' >> main.c
+        echo '  UINT16 ScanCode;' >> main.c
+        echo '  UINT16 UnicodeChar;' >> main.c
+        echo '} EFI_INPUT_KEY;' >> main.c
+        echo '' >> main.c
+        echo 'typedef struct {' >> main.c
+        echo '  void* Reset;' >> main.c
+        echo '  EFI_STATUS (*OutputString)(void* This, UINT16* String);' >> main.c
+        echo '  void* TestString;' >> main.c
+        echo '  void* QueryMode;' >> main.c
+        echo '  void* SetMode;' >> main.c
+        echo '  void* SetAttribute;' >> main.c
+        echo '  void* ClearScreen;' >> main.c
+        echo '  void* SetCursorPosition;' >> main.c
+        echo '  void* EnableCursor;' >> main.c
+        echo '  void* Mode;' >> main.c
+        echo '} EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;' >> main.c
+        echo '' >> main.c
+        echo 'typedef struct {' >> main.c
+        echo '  void* Hdr;' >> main.c
+        echo '  UINT16* FirmwareVendor;' >> main.c
+        echo '  UINT32 FirmwareRevision;' >> main.c
+        echo '  EFI_HANDLE ConsoleInHandle;' >> main.c
+        echo '  void* ConIn;' >> main.c
+        echo '  EFI_HANDLE ConsoleOutHandle;' >> main.c
+        echo '  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL* ConOut;' >> main.c
+        echo '  EFI_HANDLE StandardErrorHandle;' >> main.c
+        echo '  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL* StdErr;' >> main.c
+        echo '  void* RuntimeServices;' >> main.c
+        echo '  void* BootServices;' >> main.c
+        echo '  UINT64 NumberOfTableEntries;' >> main.c
+        echo '  void* ConfigurationTable;' >> main.c
+        echo '} EFI_SYSTEM_TABLE;' >> main.c
+        echo '' >> main.c
+        echo 'EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {' >> main.c
+        echo '  SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Hello from UEFI!\\r\\n");' >> main.c
+        echo '  SystemTable->ConOut->OutputString(SystemTable->ConOut, L"Built with MinGW in 30 seconds!\\r\\n");' >> main.c
+        echo '  return EFI_SUCCESS;' >> main.c
+        echo '}' >> main.c
         
-    - name: Compile
+    - name: Compile to EFI
       run: |
-        x86_64-w64-mingw32-gcc -ffreestanding -fshort-wchar -fno-stack-protector \
-            -mno-red-zone -c main.c -o main.o
-        x86_64-w64-mingw32-ld -shared -Bsymbolic -nostdlib -znocombreloc \
-            -o main.dll main.o
+        x86_64-w64-mingw32-gcc -ffreestanding -fshort-wchar -fno-stack-protector -mno-red-zone -c main.c -o main.o
+        x86_64-w64-mingw32-ld -shared -Bsymbolic -nostdlib -znocombreloc -o main.dll main.o
         cp main.dll HelloUEFI.efi
         
-    - name: Upload
+    - name: Upload EFI file
       uses: actions/upload-artifact@v4
       with:
         name: HelloUEFI
